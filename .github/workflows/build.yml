@@ -9,10 +9,10 @@ on:
       os:
         required: true
         type: string
-      setupCommand:
+      buildArgs:
         required: true
         type: string
-      buildArgs:
+      assetType:
         required: true
         type: string
       artifactName:
@@ -23,32 +23,29 @@ on:
         type: string
 
 env:
-  HAXE_VERSION: 4.3.6
-  JAVA_VERSION: 17
-  ANDROID_PLATFORM: android-33
+  HAXE_VERSION: 4.3.7
   PROJECT_NAME: PsychEngine
+  ANDROID_PLATFORM: android-33
+  JAVA_VERSION: 17
 
 jobs:
   build:
     runs-on: ${{ inputs.os }}
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      # Setup Java
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
-      # Setup Haxe
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
         with:
           haxe-version: ${{ env.HAXE_VERSION }}
 
-      # Install Lime & Libraries
       - name: Install Lime
         run: haxelib install lime
 
@@ -58,53 +55,42 @@ jobs:
       - name: Install other Haxe libraries
         run: ${{ inputs.setupCommand }}
 
-      # Android SDK
       - name: Setup Android SDK
         if: inputs.name == 'Android'
         run: |
-          mkdir -p ${{ github.workspace }}/android-sdk/cmdline-tools
+          mkdir -p ${{ github.workspace }}/android-sdk
           cd ${{ github.workspace }}/android-sdk
           wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-          unzip cmdline-tools.zip -d cmdline-tools
+          unzip cmdline-tools.zip
           mkdir -p cmdline-tools/latest
-          mv cmdline-tools/cmdline-tools/* cmdline-tools/latest/
-          yes | cmdline-tools/latest/bin/sdkmanager --sdk_root=${{ github.workspace }}/android-sdk --licenses
-          cmdline-tools/latest/bin/sdkmanager --sdk_root=${{ github.workspace }}/android-sdk "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;33.0.2"
+          mv cmdline-tools/* cmdline-tools/latest/
+          yes | ${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=${{ github.workspace }}/android-sdk --licenses
+          ${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=${{ github.workspace }}/android-sdk "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;33.0.2"
+          echo "ANDROID_HOME=${{ github.workspace }}/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=${{ github.workspace }}/android-sdk" >> $GITHUB_ENV
 
-      # Android NDK
       - name: Setup Android NDK
         if: inputs.name == 'Android'
         run: |
           wget https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
           unzip android-ndk-r25b-linux.zip
           mv android-ndk-r25b ${{ github.workspace }}/android-ndk
-
-      # Export Android Environment Variables
-      - name: Set Android Environment Variables
-        if: inputs.name == 'Android'
-        run: |
-          echo "ANDROID_HOME=${{ github.workspace }}/android-sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=${{ github.workspace }}/android-sdk" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=${{ github.workspace }}/android-ndk" >> $GITHUB_ENV
-          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
 
-      # Configure Lime for Android
       - name: Configure Lime for Android
         if: inputs.name == 'Android'
         run: |
-          haxelib run lime config ANDROID_SDK $ANDROID_SDK_ROOT
+          haxelib run lime config ANDROID_SDK $ANDROID_HOME
           haxelib run lime config ANDROID_NDK_ROOT $ANDROID_NDK_ROOT
           haxelib run lime config JAVA_HOME $JAVA_HOME
           haxelib run lime config ANDROID_SETUP true
 
-      # Build
       - name: Compile
-        run: haxelib run lime build ${{ inputs.buildArgs }}
+        run: haxelib run lime build ${{ inputs.buildArgs }} -Dandroid -D ${{ inputs.assetType }}
 
-      # Upload Artifact
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.artifactName }}
+          name: ${{ inputs.artifactName }}-${{ inputs.assetType }}
           path: ${{ inputs.artifactPath }}
           if-no-files-found: error
