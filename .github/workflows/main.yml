@@ -1,11 +1,10 @@
 name: Main
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 
 jobs:
-  Build:
-    name: Android
-    runs-on: ubuntu-22.04
+  AndroidBuild:
     uses: ./.github/workflows/build.yml
     with:
       name: Android
