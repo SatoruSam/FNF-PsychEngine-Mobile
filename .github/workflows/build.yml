@@ -34,12 +34,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
 
-      - name: Set Android environment
-        run: |
-         haxelib run lime config ANDROID_SDK /opt/android-sdk
-         haxelib run lime config ANDROID_NDK_ROOT /opt/android-ndk
-         haxelib run lime config JAVA_HOME /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.17-10/x64
-
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
         with:
@@ -59,6 +53,15 @@ jobs:
           ndk-version: r25b
           add-to-path: false
 
+      # Set Android environment after Haxe is installed
+      - name: Set Android environment
+        if: inputs.name == 'Android'
+        run: |
+          echo "Configuring Android environment variables"
+          haxelib run lime config ANDROID_SDK /opt/android-sdk
+          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }}
+          haxelib run lime config JAVA_HOME $JAVA_HOME
+
       - name: Install Libraries
         run: ${{ inputs.setupCommand }}
 
@@ -69,10 +72,7 @@ jobs:
       - name: Configure Android
         if: inputs.name == 'Android'
         run: |
-          echo "Setting JAVA_HOME for Android build"
-          haxelib run lime config ANDROID_SDK $ANDROID_HOME
-          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }}
-          haxelib run lime config JAVA_HOME $JAVA_HOME
+          echo "Final Android configuration"
           haxelib run lime config ANDROID_SETUP true
 
       - name: Compile
