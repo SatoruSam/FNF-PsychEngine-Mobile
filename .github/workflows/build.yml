@@ -56,6 +56,10 @@ jobs:
       - name: Install Libraries
         run: ${{ inputs.setupCommand }}
 
+      - name: Install linc_luajit
+        if: inputs.name == 'Android'
+        run: haxelib install linc_luajit
+
       - name: Configure Android
         if: inputs.name == 'Android'
         run: |
