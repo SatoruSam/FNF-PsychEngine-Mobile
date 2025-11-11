@@ -34,6 +34,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
 
+      - name: Set Android environment
+        run: |
+         haxelib run lime config ANDROID_SDK /opt/android-sdk
+         haxelib run lime config ANDROID_NDK_ROOT /opt/android-ndk
+         haxelib run lime config JAVA_HOME /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/17.0.17-10/x64
+
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
         with:
