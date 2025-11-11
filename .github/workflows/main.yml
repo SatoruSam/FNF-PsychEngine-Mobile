@@ -1,15 +1,24 @@
 name: Main
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
-  AndroidBuild:
+  Build:
+    strategy:
+      matrix:
+        include:
+          - name: Android
+            os: ubuntu-22.04
+            buildArgs: "android -ONLY_ARMV7"
+            assetType: ASTC
+            artifactName: androidBuild
+            artifactPath: "export/release/android/bin/app/build/outputs/apk/release/*.apk"
     uses: ./.github/workflows/build.yml
     with:
-      name: Android
-      os: ubuntu-22.04
+      name: ${{ matrix.name }}
+      os: ${{ matrix.os }}
+      buildArgs: ${{ matrix.buildArgs }}
+      assetType: ${{ matrix.assetType }}
+      artifactName: ${{ matrix.artifactName }}
+      artifactPath: ${{ matrix.artifactPath }}
       setupCommand: sh ./setup/unix.sh
-      buildArgs: "android -Dandroid -ONLY_ARMV7"
-      artifactName: androidBuild
-      artifactPath: "export/release/android/bin/app/build/outputs/apk/release/*.apk"
