@@ -34,23 +34,42 @@ jobs:
       - name: Checkout
         uses: actions/checkout@main
 
+      # Haxe Setup
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
         with:
           haxe-version: ${{ env.HAXE_VERSION }}
 
+      # Java Setup
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
+      # Install Lime
       - name: Install Lime
         run: haxelib install lime
 
+      # Install project libraries
       - name: Install Libraries
         run: ${{ inputs.setupCommand }}
 
+      # Android SDK Setup
+      - name: Setup Android SDK
+        if: inputs.name == 'Android'
+        run: |
+          sudo mkdir -p /opt/android-sdk
+          sudo chown $USER /opt/android-sdk
+          curl -s https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -o cmdline-tools.zip
+          unzip cmdline-tools.zip -d /opt/android-sdk
+          mv /opt/android-sdk/cmdline-tools /opt/android-sdk/cmdline-tools-temp
+          mkdir -p /opt/android-sdk/cmdline-tools/latest
+          mv /opt/android-sdk/cmdline-tools-temp/* /opt/android-sdk/cmdline-tools/latest/
+          yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/opt/android-sdk "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+          echo "ANDROID_SDK=/opt/android-sdk" >> $GITHUB_ENV
+
+      # Android NDK Setup
       - name: Setup Android NDK
         if: inputs.name == 'Android'
         id: setup-ndk
@@ -59,10 +78,12 @@ jobs:
           ndk-version: r25b
           add-to-path: false
 
+      # Install linc_luajit
       - name: Install linc_luajit
         if: inputs.name == 'Android'
         run: haxelib install linc_luajit
 
+      # Configure Lime for Android
       - name: Configure Android
         if: inputs.name == 'Android'
         run: |
@@ -72,9 +93,11 @@ jobs:
           haxelib run lime config JAVA_HOME $JAVA_HOME
           haxelib run lime config ANDROID_SETUP true
 
+      # Compile
       - name: Compile
         run: haxelib run lime build ${{ inputs.buildArgs }}
 
+      # Upload artifact
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
