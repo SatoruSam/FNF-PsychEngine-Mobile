@@ -24,80 +24,84 @@ on:
 
 env:
   HAXE_VERSION: 4.3.6
+  JAVA_VERSION: 17
+  ANDROID_PLATFORM: android-33
   PROJECT_NAME: PsychEngine
 
 jobs:
   build:
-    name: Build
     runs-on: ${{ inputs.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      # Haxe Setup
+      # Setup Java
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      # Setup Haxe
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
         with:
           haxe-version: ${{ env.HAXE_VERSION }}
 
-      # Java Setup
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17
-
-      # Install Lime
+      # Install Lime & Libraries
       - name: Install Lime
         run: haxelib install lime
 
-      # Install project libraries
-      - name: Install Libraries
+      - name: Install linc_luajit
+        run: haxelib install linc_luajit
+
+      - name: Install other Haxe libraries
         run: ${{ inputs.setupCommand }}
 
-      # Android SDK Setup
+      # Android SDK
       - name: Setup Android SDK
         if: inputs.name == 'Android'
         run: |
-          sudo mkdir -p /opt/android-sdk
-          sudo chown $USER /opt/android-sdk
-          curl -s https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -o cmdline-tools.zip
-          unzip cmdline-tools.zip -d /opt/android-sdk
-          mv /opt/android-sdk/cmdline-tools /opt/android-sdk/cmdline-tools-temp
-          mkdir -p /opt/android-sdk/cmdline-tools/latest
-          mv /opt/android-sdk/cmdline-tools-temp/* /opt/android-sdk/cmdline-tools/latest/
-          yes | /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/opt/android-sdk "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-          echo "ANDROID_SDK=/opt/android-sdk" >> $GITHUB_ENV
+          mkdir -p ${{ github.workspace }}/android-sdk/cmdline-tools
+          cd ${{ github.workspace }}/android-sdk
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+          unzip cmdline-tools.zip -d cmdline-tools
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools/cmdline-tools/* cmdline-tools/latest/
+          yes | cmdline-tools/latest/bin/sdkmanager --sdk_root=${{ github.workspace }}/android-sdk --licenses
+          cmdline-tools/latest/bin/sdkmanager --sdk_root=${{ github.workspace }}/android-sdk "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;33.0.2"
 
-      # Android NDK Setup
+      # Android NDK
       - name: Setup Android NDK
         if: inputs.name == 'Android'
-        id: setup-ndk
-        uses: nttld/setup-ndk@main
-        with:
-          ndk-version: r25b
-          add-to-path: false
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
+          unzip android-ndk-r25b-linux.zip
+          mv android-ndk-r25b ${{ github.workspace }}/android-ndk
 
-      # Install linc_luajit
-      - name: Install linc_luajit
-        if: inputs.name == 'Android'
-        run: haxelib install linc_luajit
-
-      # Configure Lime for Android
-      - name: Configure Android
+      # Export Android Environment Variables
+      - name: Set Android Environment Variables
         if: inputs.name == 'Android'
         run: |
-          echo "Configuring Android environment variables"
-          haxelib run lime config ANDROID_SDK /opt/android-sdk
-          haxelib run lime config ANDROID_NDK_ROOT ${{ steps.setup-ndk.outputs.ndk-path }}
+          echo "ANDROID_HOME=${{ github.workspace }}/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=${{ github.workspace }}/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=${{ github.workspace }}/android-ndk" >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+
+      # Configure Lime for Android
+      - name: Configure Lime for Android
+        if: inputs.name == 'Android'
+        run: |
+          haxelib run lime config ANDROID_SDK $ANDROID_SDK_ROOT
+          haxelib run lime config ANDROID_NDK_ROOT $ANDROID_NDK_ROOT
           haxelib run lime config JAVA_HOME $JAVA_HOME
           haxelib run lime config ANDROID_SETUP true
 
-      # Compile
+      # Build
       - name: Compile
         run: haxelib run lime build ${{ inputs.buildArgs }}
 
-      # Upload artifact
+      # Upload Artifact
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
